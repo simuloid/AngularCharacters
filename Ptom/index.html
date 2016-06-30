@@ -1,0 +1,736 @@
+<!-- 
+     TODO: 
+     different damage types, 
+     misc atk bonuses, 
+
+     implement multi-tap on hold
+	 Sound for tap feedback?
+	 Add BAB to Combat block
+	 Add Saving Throws to Combat block
+	 Re-think Condition Display/Selection
+	 On roll spell casting, show aux iff success.
+
+  -->
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+	"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html ng-app="GameSupport" ng-controller="GameSupportCtrl" lang='en' xml:lang='en' xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <style type="text/css" media="all">
+      @import "../libs/char_sheet.css";
+    </style>
+	
+    <title>{{data['character_name']}} Fantasy Craft Character Sheet</title>
+  </head>
+  <body onMouseMove="window.lastMouseX = event.pageX; window.lastMouseY = event.pageY;">
+   <div id="dice block">
+      <table >
+        <tr ng-click="toggleBlockVisibility('dice');">
+          <th colspan="9" class="collapsible">Dice</th>
+        </tr>
+        <tr style="height: 2em; font-size: 200%;" ng-show="blockIsVisible('dice')">
+          <th class="rollable square dice"
+              ng-click="showRoll('Roll', '1d4', $event);">d4</th>
+          <th class="rollable square dice"
+              ng-click="showRoll('Roll', '1d6', $event);">d6</th>
+          <th class="rollable square dice"
+              ng-click="showRoll('Roll', '1d8', $event);">d8</th>
+          <th class="rollable square dice"
+              ng-click="showRoll('Roll', '1d10', $event);">d10</th>
+          <th class="rollable square dice"
+              ng-click="showRoll('Roll', '1d12', $event);">d12</th>
+          <th class="rollable square dice"
+              ng-click="showRoll('Roll', '1d20', $event);">d20</th>
+				  
+			<td style="width: 25%; font-size: 75%; background: black;">
+				<table colspan="1" style="font-size: 50%; padding: 0px; border-spacing: 0px;">
+					<tr style="font-size: 120%;">
+					  <th rowspan="2" class="rollable square dice" style="width: 30%; font-size: 150%"
+							ng-click="showActionDie($event);">Action<br/>Dice</th>
+					  <td class="square bigger" ng-click="data['cur_action_dice'] = data['cur_action_dice'] + 1;">{{data['cur_action_dice']}}</td>
+					  <td class="square clickable bigger" ng-click="data['cur_action_dice'] = data['starting_action_dice'];">{{data['starting_action_dice']}}</td>
+					  <td class="square bigger" >d{{data['action_die_type']}}</td>
+					  <td class="square bigger" >{{data['action_die_explode']}}</td>
+					</tr>
+					<tr class="label">
+					  <th class="square" ng-click="data['cur_action_dice'] = data['cur_action_dice'] + 1;">Remaining Dice</th>
+					  <th class="clickable square" ng-click="data['cur_action_dice'] = data['starting_action_dice'];">Starting Dice</th>
+					  <th class="square">Die Type</th>
+					  <th class="square">Explodes On</th>
+					</tr>
+				</table>
+			</td>
+          
+         <td style="width: 15%;">
+            <input onClick="this.select();"
+						 onkeydown="if (event.keyCode == 13) document.getElementById('rollDiceBtn').click()"
+                   type="text" size="4" id="diceInput" style="font-size: 120%;"
+						 ng-model="diceInput"/>
+         </td>
+         <td style="width: 7%;">
+				<button id="rollDiceBtn" style="font-size: 100%;" ng-click="rollInputDice($event, diceInput)">Roll</button>
+			</td>
+        </tr>
+      </table>
+   </div>
+    
+  <div id="conditions_block">
+    <table >
+     <tr ng-click="toggleBlockVisibility('conditions');"><th class="collapsible" colspan="7">Conditions</th></tr>
+	  <tr ng-repeat="condition in data.conditions | orderBy: 'name'" ng-show="blockIsVisible('conditions')">
+		<td width="10%" align="center" style="font-size:3 em" class="clickable" ng-click="condition.addGrade($event);">+</td>
+		<td width="15%" align="center" class="rollable" ng-click="condition.showDescription($event);" 
+			ng-class="{ true: 'selected', false: 'none'}[condition.grade > 0]">{{condition.getName()}}</td>
+		<td width="10%" align="center" style="font-size:3 em" class="clickable" ng-click="condition.removeGrade($event);">-</td>
+		<td width="10%" align="center" class="clickable" ng-click="condition.removeAll($event);">Remove</td>
+	  </tr>
+	</table>
+  </div>
+  
+   <div id="combat_block">
+      <table >
+        <tr ng-click="toggleBlockVisibility('combat');"><th class="collapsible" colspan="2">Combat</th></tr>
+        <tr ng-show="blockIsVisible('combat')">
+          <td colspan="3">
+			<table style="background: red;">
+				<tr>
+					<td><table>
+						<tr>
+							<th class="label">Base Attack</th>
+							<td>{{data['base_attack']}}</td>
+						</tr>
+						<tr class="">
+							<th>Defense</th>
+							<td>{{data['defense_total']()}}</td>
+						</tr>
+						<tr class="">
+							<th>Dmg Redux</th>
+							<td>{{data['dr']}}</td>
+						</tr>
+						<tr class="">
+							<th class="label rollable" 
+								ng-click="showRoll('Initiative', 
+												'd20+' + data['initiative_total'](), 
+												$event);">Initiative</th>
+							<td ng-class="compareToOriginal('initiative_total', data['initiative_total']())">{{data['initiative_total']() | bonus}}</td>
+						</tr>
+					</table></td>
+					<td><table >
+						<tr class="label" ng-show="blockIsVisible('combat')">
+							<td>Attack</td><td>Bonus</td>
+						</tr>
+						<tr>
+							<th class="label rollable" 
+								ng-click="showRoll('Unarmed Attack', 
+												'd20+' + data['unarmed_total'](), 
+												$event);">Unarmed</th>
+							<td ng-class="compareToOriginal('unarmed_total', data['unarmed_total']())">{{data['unarmed_total']() | bonus}}</td>
+						</tr>
+						<tr>
+							<th class="label rollable" 
+								ng-click="showRoll('Melee Attack', 
+												'd20+' + data['melee_total'](), 
+												$event);">Melee</th>
+							<td ng-class="compareToOriginal('melee_total', data['melee_total']())">{{data['melee_total']() | bonus}}</td>
+						</tr>
+						<tr>
+							<th class="label rollable" 
+								ng-click="showRoll('Ranged Attack', 
+												'd20+' + data['ranged_total'](), 
+												$event);">Ranged</th>
+							<td ng-class="compareToOriginal('ranged_total', data['ranged_total']())">{{data['ranged_total']() | bonus}}</td>
+						</tr>
+					</table></td>
+					<td><table >
+					  <tr class="label" ng-show="blockIsVisible('combat')">
+						 <td>Saving Throw</td>
+						 <td>Total</td>
+					  </tr>
+					  <tr ng-repeat="s in [ 'fortitude', 'reflex', 'will' ]"
+							ng-show="blockIsVisible('combat')">
+						<th class="rollable" ng-click="rollSave(s, $event);">{{s | titleCase}}</th>
+						<td ng-class="compareToOriginal(s+'_total', data[s+'_total']())">{{data[s+'_total']() | bonus}}</td>
+					  </tr>
+					</table></td>
+					<td><table >
+					  <tr class="label" ng-show="blockIsVisible('combat')">
+						 <td>Weapon</td>
+						 <td>Attack</td>
+						 <td>Damage</td>
+					  </tr>
+					  <tr ng-repeat="weapon in data['weapons']" ng-show="blockIsVisible('combat')">
+						 <th class="rollable" rowspan="1" 
+								ng-click="showAttackAndDamage(weapon, $event)"
+							>{{weapon.name | titleCase}}</th>
+						  <td ng-click="showAttack(weapon, $event)"
+								ng-class="compareToOriginal(weapon.name + 
+								'_toHit', weapon.bonus())" class="link"
+							>{{weapon.bonus() | bonus}}</td>
+						  <td ng-click="showDamage(weapon, $event)"
+								ng-class="compareToOriginal(weapon.name + 
+								'_dmg_bonus', weapon.damageBonus())" class="link"
+							>{{weapon.damageBase+formatBonus(weapon.damageBonus() )}}</td>
+					  </tr>
+					</table></td>
+				</tr>
+			</table>
+          </td>
+        </tr>
+        <tr ng-show="blockIsVisible('combat')">
+          <td>
+            <table  width="100%">
+              <tr>
+                <th colspan="9">Vitality</th>
+              </tr>
+              <tr class="label">
+                <td width="10%">Max</td>
+                <td>-</td>
+                <td width="10%">Dmg</td>
+                <td>=</td>
+                <td width="10%">Cur</td>
+                <th
+                   style="font-size: 150%; color: red;" 
+                   rowspan="2" 
+                   ng-click="adjustDamage('vitality', -5)";
+                   >-5
+                </th>
+                <th 
+                   style="font-size: 150%; color: red;" 
+                   rowspan="2" 
+                   ng-click="adjustDamage('vitality', -1)"
+                   >-1
+                <th
+                   style="font-size: 150%; color: green;" 
+                   rowspan="2" 
+                   ng-click="adjustDamage('vitality', 1)"
+                   >+1
+                </th>
+                <th 
+                   style="font-size: 150%; color: green;" 
+                   rowspan="2" 
+                   ng-click="adjustDamage('vitality', 5)"
+                   >+5
+                </th>
+               </th>
+              </tr>
+              <tr ng-click="resetDamage('vitality')">
+                <td width="10%">{{data['max_vitality']}}</td>
+                <td>-</td>
+                <td width="10%">{{data['lost_vitality']}}</td>
+                <td>=</td>
+                <td width="10%">{{data['cur_vitality']}}</td>
+              </tr>
+            </table>
+          </td>
+          <td>
+            <table  width="100%">
+              <tr>
+                <th colspan="7">Wounds</th>
+              </tr>
+              <tr class="label">
+                <td width="20%">Max</td>
+                <td>-</td>
+                <td width="20%">Dmg</td>
+                <td>=</td>
+                <td width="20%">Cur</td>
+                <th 
+                   style="font-size: 150%; color: green;" 
+                   rowspan="2" 
+                   ng-click="adjustDamage('wounds', 1);"
+                   >Heal
+                </th>
+                <th 
+                   style="font-size: 150%; color: red;" 
+                   rowspan="2" 
+                   ng-click="adjustDamage('wounds', -1);"
+                   >Dmg
+                </th>
+              </tr>
+              <tr ng-click="resetDamage('wounds');">
+                <td width="20%">{{data['max_wounds']}}</td>
+                <td>-</td>
+                <td width="20%">{{data['lost_wounds']}}</td>
+                <td>=</td>
+                <td width="20%">{{data['cur_wounds']}}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+   </div combat-block>
+    
+  <div id="weapons_block" ng-show="blockIsVisible('combat')">
+    <table >
+      <tr ng-click="toggleBlockVisibility('weapons');"><th colspan="7" class="collapsible">Weapon Details</th></tr>
+		<tbody ng-repeat="weapon in data['weapons']" class="loud" ng-show="blockIsVisible('weapons')">
+			<tr>
+			  <th class="rollable" rowspan="4" 
+					ng-click="showAttackAndDamage(weapon, $event)"
+				>{{weapon.name | titleCase}}</th>
+			  <td>{{weapon.damageType}}</td>
+			  <td ng-click="showAttack(weapon, $event)"
+					ng-class="compareToOriginal(weapon.name + 
+					'_toHit', weapon.bonus())"
+				>{{weapon.bonus()}}</td>
+			  <td ng-click="showDamage(weapon, $event)"
+					ng-class="compareToOriginal(weapon.name + 
+					'_dmg_bonus', weapon.damageBonus())"
+				>{{weapon.damageBase+formatBonus(weapon.damageBonus() )}}</td>
+			  <td>{{weapon.threat}}</td>
+			  <td>{{weapon.size}}</td>
+			  <td>{{weapon.weight}}</td>
+			</tr>
+			<tr class="label">
+			  <td>Type</td>
+			  <td class=link ng-click="showAttack(weapon, $event)">ATK</td>
+			  <td class=link ng-click="showDamage(weapon, $event)">DMG</td>
+			  <td>Threat</td>
+			  <td>SZ/HAND</td>
+			  <td>Wgt</td>
+			</tr>
+			<tr>
+			  <td>{{weapon.range}}</td>
+			  <td>{{weapon.shots}}</td>
+			  <td colspan="5">{{weapon.props}}</td>
+			</tr>
+			<tr class="label">
+			  <td>Range</td><td>Shots</td><td colspan="5">Qualities/Upgrades</td>
+			</tr>
+		</tbody>
+    </table>
+  </div>
+  
+  <div id="skills_block">
+    <table >
+      <!--tr onClick="toggleTableBlock(this);"-->
+      <tr ng-click="toggleBlockVisibility('skills');">
+        <th class="collapsible" colspan="16">Skills</th>
+      </tr>
+      <tr class="big label" ng-show="blockIsVisible('skills')">
+        <td>Origin</td><td>Skill Name</td><td>Attrib</td><td>Bonus</td>
+        <td>Ranks</td><td>Attr<br/>Mod</td><td>Misc.<br/>Mod.</td><td>Threat<br/>Range</td><td>Notes</td>
+      </tr>
+      <tr ng-repeat="skill in data.skills | orderBy: 'name'" 
+			ng-click="showSkill(skill.name, $event);"
+			ng-show="blockIsVisible('skills')"
+			class="stripes">
+        <td>{{skill.isOrigin | checkmark}}</td>
+        <th class="rollable">{{skill.name | titleCase }}</th>
+        <td>{{skill.attr_name | uppercase}}</td>
+        <td ng-class="temp[1 + sign(skill.curTotal() - skill.total)]">{{skill.curTotal() | bonus}}</td>
+        <td>{{skill.ranks}}</td>
+        <td ng-class="compareToOriginal(skill.attr_name+'_mod', skill.attr_mod())">{{skill.attr_mod() | bonus}}</td>
+        <td>{{skill.misc | bonus}}</td>
+        <td>{{skill.threat}}</td>
+        <td>{{skill.notes}}</td>
+        <!--td>{{temp[1 + sign(skill.curTotal() - skill.total)]}}</td-->
+      </tr>
+    </table>
+  </div>
+  
+  <div id="abilities_block">
+    <table  id="abilities_table">
+      <tr ng-click="toggleBlockVisibility('abilities');">
+        <th colspan="2" class="collapsible">Feats &amp; Abilities</th>
+      </tr>
+      <tr class="big label" ng-show="blockIsVisible('abilities')" id="abilities_header_row">
+        <td width="25%">Name</td><td width="75%">Notes</td>
+      </tr>
+		<tr ng-repeat="ability in data.abilities | orderBy: [0]" 
+			ng-show="blockIsVisible('abilities')"
+			class="stripes">
+        <td width="25%">{{ability[0]}}</td><td width="75%">{{ability[1]}}</td>
+		</tr>
+    </table>
+  </div>
+  
+  <div id="attack_actions_block">
+    <table >
+      <tr ng-click="toggleBlockVisibility('attack_actions');">
+        <th colspan="4" class="collapsible">Other Actions</th>
+      </tr>
+		<tbody ng-show="blockIsVisible('attack_actions')">
+			<tr class="big label">
+			  <td>Action</td><td>Bonus</td><td>Time</td><td>Effect</td>
+			</tr>
+			<tr class="stripes">
+			  <th class="rollable" ng-click="showNamedSkill('athletics', $event);">Bull Rush</th>
+			  <td>{{data.skills.athletics.curTotal() | bonus}}</td>
+			  <td>full</td>
+			  <td style="text-align:left;">Move up to Speed toward 1 opponent; opposed Athletics check to push target 1 square + 1 additional square per 4 over opponent result; target becomes sprawled</td>
+			</tr>
+			<tr class="stripes">
+			  <th>Coup de Grace</th>
+			  <td>{{data.weapons[0].bonus() | bonus}}</td>
+			  <td>full</td>
+			  <td style="text-align:left;">(Helpless adjacent target only) hit = unconscious or automatic critical hit + save vs. death (Fort DC 10 + Damage)</td>
+			</tr>
+			<tr class="stripes">
+			  <th class="rollable" ng-click="showRoll('Disarm', '1d20' + formatBonus(data.weapons[0].bonus()), $event);">Disarm</th>
+			  <td>{{data.weapons[0].bonus() | bonus}}</td>
+			  <td>half</td>
+			  <td style="text-align:left;">Standard Attack vs. Standard Attack to disarm 1 target in Close Quarters</td>
+			</tr class="stripes">
+			<tr ng-click="showNamedSkill('prestidigitation', $event);">
+			  <th class="rollable">Feint</th>
+			  <td>{{data.skills['prestidigitation'].curTotal() | bonus}}</td>
+			  <td>half</td>
+			  <td style="text-align:left;">Prestidigitation vs. Notice to render adjacent opponent flat-footed</td>
+			</tr>
+			<tr class="stripes">
+			  <th class="rollable" ng-click="showNamedSkill('athletics', $event);">Grapple</th>
+			  <td>{{data.skills.athletics.curTotal() | bonus}}</td>
+			  <td>full</td>
+			  <td style="text-align:left;">Athletics vs. Athletics to render target held; both characters become vulnerable and may make additional Athletics (Str) checks to gain Grapple benefits</td>
+			</tr>
+			<tr class="stripes">
+			  <th class="rollable" 
+					ng-click="showRoll('Unarmed Attack', '1d20' + formatBonus(data['unarmed_total']()), $event);">Pummel</th>
+			  <td>{{data['unarmed_total']() | bonus}}</td>
+			  <td>full</td>
+			  <td style="text-align:left;">Unarmed attack: hit = triple subdual damage</td>
+			</tr>
+			<tr class="stripes">
+			  <th class="rollable" ng-click="showNamedSkill('sense motive', $event);">Taunt</th>
+			  <td>{{data.skills['sense motive'].curTotal() | bonus}}</script></td>
+			  <td>half</td>
+			  <td style="text-align:left;">Sense Motive vs. Sense Motive to force opponent in Close Quarters to attack you with next action</td>
+			</tr>
+			<tr class="stripes">
+			  <th class="rollable" ng-click="showNamedSkill('intimidate', $event, null, '1d6');">Threaten</th>
+			  <td>{{data.skills['intimidate'].curTotal() | bonus}}</td>
+			  <td>half</td>
+			  <td style="text-align:left;">Intimidate vs. Resolve to inflict 1d6 stress damage to opponent in Close Quarters</td>
+			</tr>
+			<tr class="stripes">
+			  <th class="rollable" ng-click="showNamedSkill('resolve', $event, null, '1d6');">Tire</th>
+			  <td>{{data.skills['resolve'].curTotal() | bonus}}</td>
+			  <td>half</td>
+			  <td style="text-align:left;">Resolve vs. Resolve to inflict 1d6 subdual damage to adjacent opponent</td>
+			</tr>
+			<tr class="stripes">
+			  <th class="rollable" ng-click="showNamedSkill('acrobatics', $event);">Trip</th>
+			  <td>{{data.skills['acrobatics'].curTotal() | bonus}}</td>
+			  <td>half</td>
+			  <td style="text-align:left;">Acrobatics vs. Acrobatics to render target sprawled</td>
+			</tr>
+			<tr class="stripes">
+			  <th>Aim</th>
+			  <td>-</td>
+			  <td>half</td>
+			  <td style="text-align:left;">+1 with Standard Attack vs Unmoving target</td>
+			</tr>
+			<tr class="stripes">
+			  <th class="rollable" ng-click="showNamedSkill('sense motive', $event);">Anticipate</th>
+			  <td>{{data.skills['sense motive'].curTotal() | bonus}}</td>
+			  <td>half</td>
+			  <td style="text-align:left;">Sense Motive (DC 10 + target base attack bonus); success = dodge bonus to Defense equal to Wis mod (min. +1) for 1 full round</td>
+			</tr>
+			<tr class="stripes">
+			  <th class="rollable" ng-click="showNamedSkill('bluff', $event);">Distract</th>
+			  <td>{{data.skills['bluff'].curTotal() | bonus}}</td>
+			  <td>half</td>
+			  <td style="text-align:left;">Bluff (Dex) vs. Sense Motive to reduce opponent’s Initiative by 2d6 for this round only</td>
+			</tr>
+			<tr class="stripes">
+			  <th>Ready</th>
+			  <td>-</td>
+			  <td>full</td>
+			  <td style="text-align:left;">1 half action taken later during this round</td>
+			</tr>
+			<tr class="stripes">
+			  <th>Refresh</th>
+			  <td>-</td>
+			  <td>1 round</td>
+			  <td style="text-align:left;">If not attacked, regain 1 action die’s result in vitality or 2 wounds</td>
+			</tr>
+			</tbody>
+		</tbody>
+    </table>
+  </div>
+  
+  <div id="magic" ng-show="data.spells && data.spells.length > 0">
+    <table id="spell_table" >
+      <tr ng-click="toggleBlockVisibility('magic');">
+        <th colspan="7" class="collapsible">Spells</th>
+      </tr>
+      <tbody ng-show="blockIsVisible('magic')">
+			<tr ng-show="data['spell points']">
+			  <td colspan="6">
+				 <table width="100%" >
+					<tr>
+					  <th width="20%" height="3em" style="text-align: center;"
+					    class="clickable"
+						ng-click="data['cur_spellpoints'] = data['spell points']">Reset Spell<br>Points to&nbsp;
+				  {{data['spell points']}}</th>
+					  <th class="clickable" width="10%" style="font-size: 350%; color: red; margin: 0px;" ng-click="addValue('cur_spellpoints', -5);">&#x2212;<br style="margin: 0px; padding: 0px;"/><span style="color: black; font-size:25%">5 SP</span></th>
+					  <th class="clickable" width="10%" style="font-size: 350%; color: red; margin: 0px;" ng-click="addValue('cur_spellpoints', -1);">&#x2212;<br style="margin: 0px; padding: 0px;"/><span style="color: black; font-size:25%">1 SP</span></th>
+					  <td style="font-size: 150%;" 
+						width="20%">
+							{{data['cur_spellpoints']}}
+					  </td>
+					  <th class="clickable" width="10%" style="font-size: 350%; color: green; margin: 0px;" ng-click="addValue('cur_spellpoints', 1);">+<br style="margin: 0px; padding: 0px;"/><span style="color: black; font-size:25%">1 SP</span></th>
+					  <th class="clickable" width="10%" style="font-size: 350%; color: green; margin: 0px;" ng-click="addValue('cur_spellpoints', 5);">+<br style="margin: 0px; padding: 0px;"/><span style="color: black; font-size:25%">5 SP</span></th>
+					  <th>Spell Feats: {{data['spell_feats']}}<br>Spell Save DC: {{data['spell_save_dc']()}}</th>
+					</tr>
+				 </table>
+			  </td>			  
+			</tr>
+
+			<tr class="big label">
+				<td ng-click="sortSpellsBy('name')">Name</td>
+				<td ng-click="sortSpellsBy('level')">Level</td>
+				<td ng-click="sortSpellsBy('dc')">Cast DC</td>
+				<td>Aux</td>
+				<td ng-click="sortSpellsBy('cts')">Cast Time</td>
+				<td ng-click="sortSpellsBy('distance')">Distance</td>
+			</tr>
+			
+			<tr ng-repeat="spell in data.spells | orderBy: spellSortBy" class="stripes">
+				<th class=rollable ng-click="showSpell(spell.name, $event);">{{spell.name | titleCase}}</th>
+				<td>{{spell.level}}</td>			
+				<td class=link ng-click="castSpell(spell, $event);">{{spell.dc}}</td>
+				<td ng-bind-html-unsafe="spell.aux"/>
+				<td ng-bind-html="spell.castingTime"></td>
+				<td ng-bind-html="spell.distance"></td>
+			</tr>
+		</tbody>
+    </table>
+  </div>
+  
+  <div id="stat_block">
+    <table >
+      <tr ng-click="toggleBlockVisibility('stats');">
+        <th colspan="6" class="collapsible">Ability Scores</th>
+      </tr>
+		<tbody ng-show="blockIsVisible('stats')">
+      <tr ng-show="false">
+        <th colspan="3">Physical Attributes</th><th colspan="3">Mental Attributes</th>
+      </tr>
+      <tr class="label">
+        <td>Attribute</td><td>Score</td><td>Modifier</td><td>Attribute</td><td>Score</td><td>Modifier</td>
+      </tr>
+      <tr>
+        <th class="rollable" ng-click="showRoll('STR', 'd20'+formatBonus(data['str_mod']()), $event);">STR</th>
+		  <td ng-class="compareToOriginal('str')">{{data['str']}}</td>
+		  <td ng-class="compareToOriginal('str_mod', data['str_mod']())">{{data['str_mod']() | bonus}}</td> 
+		  
+        <th class="rollable" ng-click="showRoll('INT', 'd20'+formatBonus(data['int_mod']()), $event);">INT</th>
+		  <td ng-class="compareToOriginal('int')">{{data['int']}}</td>
+		  <td ng-class="compareToOriginal('int_mod', data['int_mod']())">{{data['int_mod']() | bonus}}</td>
+      </tr>
+      <tr>
+        <th class="rollable" ng-click="showRoll('DEX', 'd20'+formatBonus(data['dex_mod']()), $event);">DEX</th>
+		  <td ng-class="compareToOriginal('dex')">{{data['dex']}}</td>
+		  <td ng-class="compareToOriginal('dex_mod', data['dex_mod']())">{{data['dex_mod']() | bonus}}</td> 
+		  
+        <th class="rollable" ng-click="showRoll('WIS', 'd20'+formatBonus(data['wis_mod']()), $event);">WIS</th>
+		  <td ng-class="compareToOriginal('wis')">{{data['wis']}}</td>
+		  <td ng-class="compareToOriginal('wis_mod', data['wis_mod']())">{{data['wis_mod']() | bonus}}</td>
+      </tr>
+      <tr>
+        <th class="rollable" ng-click="showRoll('CON', 'd20'+formatBonus(data['con_mod']()), $event);">CON</th>
+		  <td ng-class="compareToOriginal('con')">{{data['con']}}</td>
+		  <td ng-class="compareToOriginal('con_mod', data['con_mod']())">{{data['con_mod']() | bonus}}</td>
+		  
+        <th class="rollable" ng-click="showRoll('CHA', 'd20'+formatBonus(data['cha_mod']()), $event);">CHA</th>
+		  <td ng-class="compareToOriginal('cha')">{{data['cha']}}</td>
+		  <td ng-class="compareToOriginal('cha_mod', data['cha_mod']())">{{data['cha_mod']() | bonus}}</td>
+      </tr>
+		</tbody>
+    </table>
+  </div>
+  
+  <div id="studies_block">
+    <table >
+      <tr ng-click="toggleBlockVisibility('interests');"><th colspan="6" class="collapsible">Interests</th></tr>
+			<tr ng-show="blockIsVisible('interests')">
+				<td align="center">
+					<table >
+						<tr>
+							<th class="rollable" ng-click="showNamedSkill('crafting', $event);">Crafting</th>
+						</tr>
+						<tr ng-repeat="craft in data['crafts']" class="stripes"><td>{{craft}}</td></tr>
+					</table>
+				</td>
+				<td align="center">
+					<table >
+						<tr><th class="rollable" ng-click="showNamedSkill('ride', $event);">Vehicles</th></tr>
+						<tr ng-repeat="vehicle in data['vehicles']" class="stripes"><td>{{vehicle}}</td></tr>
+					</table>
+				</td>
+				<td align="center">
+					<table >
+						<tr>
+							<th class="rollable" colspan="2" ng-click="showNamedSkill('knowledge', $event);">Interests (Studies: {{data['total_studies']}})</th>
+						</tr>
+						<tr ng-repeat="interest in data['interests']" class="stripes"><td>{{interest}}</td></tr>
+					</table>
+				</td>
+			</tr>
+		</tr>
+	</table>
+  </div>
+
+   <table>
+		<tr ng-click="toggleBlockVisibility('infrequent');"><th class="collapsible">Infrequently Used</th></tr>
+		<tbody ng-show="blockIsVisible('infrequent')" style="font-weight: bold;">
+          <tr ng-click="toggleBlockVisibility('basic');"><th>Basic Information</th></tr>
+				<td ng-show="true || blockIsVisible('basic')">
+              <div id="personal_block">
+                <table >
+                  <tr>
+                    <td>{{data['character_name']}}</td>
+                    <td>{{data['species_talent']}}</td>
+                    <td>{{data['speciality']}}</td>
+                    <td id="logo" rowspan="6" width="25%"><img src="../libs/fc_logo.png" width="100%"></img></td>
+                  </tr>
+                  <tr class="label">
+                    <td>Character Name</td>
+                    <td>Species / Talent</td>
+                    <td>Speciality</td>
+                  </tr>
+                  
+                  <tr>
+                    <td>{{data['class_level_1']}}</td>
+                    <td>{{data['class_level_2']}}</td>
+                    <td>{{data['class_level_3']}}</td>
+                  </tr>
+                  <tr class="label">
+                    <td>First Class/Level</td>
+                    <td>Second Class/Level</td>
+                    <td>Third Class/Level</td>
+                  </tr>
+                  
+                  <tr>
+                    <td>{{data['player_name']}}</td>
+                    <td>{{data['current_xp']}}</td>
+                    <td>{{data['next_level_xp']}}</td>
+                  </tr>
+                  <tr class="label">
+                    <td>Player Name</td>
+                    <td>Current XP</td>
+                    <td>Next Level XP</td>
+                  </tr>
+                </table>
+					 </div>
+                <div id="appearance_block">
+                  <table  width="100%">
+                    <tr>
+                      <td>{{data['gender']}}</td>
+                      <td>{{data['age']}}</td>
+                      <td>{{data['height']}}</td>
+                      <td>{{data['weight']}}</td>
+                      <td>{{data['eyes']}}</td>
+                      <td>{{data['hair']}}</td>
+                      <td>{{data['skin']}}</td>
+                    </tr>
+                    <tr class="label">
+                      <td>Gender</td>
+                      <td>Age</td>
+                      <td>Height</td>
+                      <td>Weight</td>
+                      <td>Eyes</td>
+                      <td>Hair</td>
+                      <td>Skin</td>
+                    </tr>
+                  </table>
+               </div>
+				  <div id="armor_block">
+					 <table >
+						<tr ng-click="toggleBlockVisibility('armor');">
+						  <th colspan="6">Armor</th>
+						</tr>
+						<tbody ng-show="true || blockIsVisible('armor')">
+						<tr>
+						  <td>Hard Leather</td><td>3</td><td>0</td><td>0</td><td>0</td><td>6</td>
+						</tr>
+						<tr class="label">
+						  <td>Type</td><td>DR</td><td>DP</td><td>ACP</td><td>Speed</td><td>Wgt</td>
+						</tr>
+						<tr>
+						  <td>0</td><td colspan="3">Fire 3</td><td colspan="2">Fitted, Light, Reinforced&nbsp;</td>
+						</tr>
+						<tr class="label">
+						  <td>Disguise</td><td colspan="3">Resistances</td><td colspan="2">Upgrades</td>
+						</tr>
+						</tbody>
+					 </table>
+				  </div>
+				 </td></tr>
+			<tr><td>
+          <div id="proficiencies_block">
+            <table  style="width: auto;">
+              <tr>
+                <th colspan="6">Proficiencies</th>
+              </tr>
+              <tr class="label">
+					 <td>Category</td>
+                <td>Proficient</td>
+					 <td>Forte</td>
+              </tr>
+              <tr>
+                <th>Unarmed</th>
+					 <td>{{data['unarmed_prof'] | checkmark}}</td>
+					 <td>{{data['unarmed_fort'] | checkmark}}</td>
+              </tr>
+              <tr>
+					 <th>Bows</th>
+                <td>{{data['bows_prof'] | checkmark}}</td>
+					 <td>{{data['bows_fort'] | checkmark}}</td>
+              </tr>
+              <tr>
+					 <th>Blunt</th>
+                <td>{{data['blunt_prof'] | checkmark}}</td>
+					 <td>{{data['blunt_fort'] | checkmark}}</td>
+              </tr>
+              <tr>
+					 <th>Black Powder</th>
+                <td>{{data['black_powder_prof'] | checkmark}}</td>
+					 <td>{{data['black_powder_fort'] | checkmark}}</td>
+              </tr>
+              <tr>
+					 <th>Edged</th>
+                <td>{{data['edged_prof'] | checkmark}}</td>
+					 <td>{{data['edged_fort'] | checkmark}}</td>
+              </tr>
+              <tr>
+					 <th>Siege Weapons</th>
+                <td>{{data['siege_prof'] | checkmark}}</td>
+					 <td>{{data['siege_fort'] | checkmark}}</td>
+              </tr>
+              <tr>
+					 <th>Hurled</th>
+                <td>{{data['hurled_prof'] | checkmark}}</td>
+					 <td>{{data['hurled_fort'] | checkmark}}</td>
+              </tr>
+            </table>
+          </div>
+			</td></tr>
+		</tbody>
+	</table>
+	
+   <div id="popup" tabindex="2">
+		<table width="100%" height="100%">
+			<tr align="center" valign="center">
+				<td id="popup_content"></td>
+			</tr>
+		</table>
+   </div>
+
+	</body>
+	
+	<script type="text/javascript" src="../libs/angularjs/1.0.5/angular.js"></script>
+	<script type="text/javascript" src="../libs/angularjs/1.0.5/angular-sanitize.js"></script>
+   <script type="text/javascript" src="../libs/MersenneTwister19937.js"></script>
+	<script type="text/javascript" src="../libs/popup.js"></script>
+	<script type="text/javascript" src="../libs/dice.js"></script>
+   <script type="text/javascript" src="../libs/spells.js"></script>
+   <script type="text/javascript" src="../libs/skills.js"></script>
+   <script type="text/javascript" src="../libs/conditions.js"></script>
+   <script type="text/javascript" src="../libs/game_support.js"></script>
+   <script type="text/javascript" src="./char_data.js"></script>
+   <script type="text/javascript" src="../libs/char_computations.js"></script>
+
+</html>
